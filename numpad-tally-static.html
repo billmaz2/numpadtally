@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Numpad tally</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style id="app-css">
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #ECEFF1;
+    --surface: #FFFFFF;
+    --ink: #17222A;
+    --muted: #5A6A75;
+    --line: #D2D9DE;
+    --accent: #14705C;
+    --accent-ink: #FFFFFF;
+    --bar-other: #A9B7BF;
+    --danger: #B3261E;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --lcd-font: "Share Tech Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    /* keypad hardware stays the same in both themes */
+    --case: #1C272D;
+    --key: #2C3941;
+    --key-hover: #3A4954;
+    --key-ink: #F2F6F8;
+    --lcd-bg: #C6D5A6;
+    --lcd-ink: #1D2A13;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10171B;
+      --surface: #182228;
+      --ink: #E7EDF0;
+      --muted: #94A5AF;
+      --line: #2B3942;
+      --accent: #4FC3A1;
+      --accent-ink: #08201A;
+      --bar-other: #4A5C67;
+      --danger: #F2887F;
+      --case: #0C1215;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10171B;
+    --surface: #182228;
+    --ink: #E7EDF0;
+    --muted: #94A5AF;
+    --line: #2B3942;
+    --accent: #4FC3A1;
+    --accent-ink: #08201A;
+    --bar-other: #4A5C67;
+    --danger: #F2887F;
+    --case: #0C1215;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 56px; }
+  h1 { font-size: 1.75rem; line-height: 1.15; margin: 0 0 6px; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; font-weight: 600; }
+  h3 { font-size: 0.95rem; margin: 22px 0 8px; font-weight: 600; }
+  .intro { color: var(--muted); max-width: 62ch; margin: 0 0 26px; }
+
+  main { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 820px) {
+    main { grid-template-columns: 360px 1fr; gap: 44px; }
+    .device { position: sticky; top: 16px; }
+  }
+  .device { order: 1; }
+  .panel { order: 0; min-width: 0; }
+  main[data-phase="run"] .device { order: -1; }
+
+  /* ---------- keypad device ---------- */
+  .device {
+    background: var(--case);
+    border-radius: 22px;
+    padding: 16px;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 12px 30px rgba(0,0,0,.18);
+  }
+  .lcd {
+    background: var(--lcd-bg);
+    color: var(--lcd-ink);
+    border-radius: 10px;
+    padding: 12px 14px 10px;
+    font-family: var(--lcd-font);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.28);
+  }
+  .lcd-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.95rem; }
+  .lcd-label { font-family: var(--sans); font-size: 0.75rem; opacity: .75; }
+  .clock { font-size: 1.9rem; letter-spacing: .04em; }
+  .slots {
+    display: flex; justify-content: center; gap: 6px;
+    margin: 14px 0 12px; min-height: 1.4em; transition: opacity .12s;
+  }
+  .slots.flash { opacity: .35; }
+  .slot {
+    width: .7em; height: 1.25em; text-align: center; line-height: 1.2;
+    border-bottom: 2px solid rgba(29,42,19,.45);
+  }
+  .progress { height: 4px; background: rgba(29,42,19,.18); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--lcd-ink); }
+
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+  .keys button {
+    font: 500 1.7rem/1 var(--lcd-font);
+    color: var(--key-ink);
+    background: var(--key);
+    border: 0; border-radius: 12px;
+    height: 64px;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+    box-shadow: 0 3px 0 rgba(0,0,0,.35);
+    transition: transform .05s, box-shadow .05s, background .1s;
+  }
+  .keys button:hover:not(:disabled) { background: var(--key-hover); }
+  .keys button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+  .keys button:disabled { opacity: .38; cursor: default; }
+  .keys .aux { font-size: 1.15rem; background: #232E35; }
+
+  /* ---------- generic controls ---------- */
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .btn {
+    font: 500 1rem/1 var(--sans);
+    padding: 13px 20px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.small { padding: 9px 14px; font-size: .9rem; }
+  .btn.warn { color: var(--danger); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+
+  .field { margin-bottom: 22px; }
+  .field > label, .field > .lbl { display: block; font-weight: 500; margin-bottom: 4px; }
+  .hint { color: var(--muted); font-size: .9rem; margin: 0 0 8px; }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .stepper button {
+    width: 46px; height: 46px; border: 0; background: transparent; color: var(--ink);
+    font-size: 1.4rem; cursor: pointer; border-radius: 10px;
+  }
+  .stepper button:hover { background: var(--bg); }
+  .stepper output { min-width: 3ch; text-align: center; font: 500 1.4rem var(--lcd-font); }
+  input[type="number"] {
+    font: 500 1.2rem var(--lcd-font); width: 8ch; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink);
+  }
+  .presets { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
+  .presets button {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 999px; padding: 8px 13px; cursor: pointer; font: 500 .9rem var(--sans);
+  }
+  .presets button:hover { border-color: var(--muted); }
+  .msg { min-height: 1.4em; margin: 10px 0 0; font-size: .92rem; color: var(--muted); }
+  .msg.err { color: var(--danger); }
+
+  /* ---------- running list ---------- */
+  .live-count { font: 500 2.6rem/1 var(--lcd-font); }
+  .entries {
+    list-style: none; margin: 10px 0 0; padding: 0; max-height: 260px; overflow-y: auto;
+    border-top: 1px solid var(--line);
+  }
+  .entries li {
+    display: flex; justify-content: space-between; padding: 7px 2px;
+    border-bottom: 1px solid var(--line); font-family: var(--lcd-font); font-size: 1.15rem;
+  }
+  .entries li span:last-child { color: var(--muted); font-family: var(--sans); font-size: .85rem; }
+  .empty { color: var(--muted); font-size: .95rem; padding: 10px 0; }
+
+  /* ---------- results ---------- */
+  .stats { display: flex; flex-wrap: wrap; margin: 4px 0 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .stat { flex: 1 1 140px; padding: 14px 16px 14px 0; }
+  .stat + .stat { padding-left: 16px; border-left: 1px solid var(--line); }
+  .stat .v { font: 500 2.1rem/1.1 var(--lcd-font); }
+  .stat .k { color: var(--muted); font-size: .88rem; }
+  .top-line { margin: 12px 0 0; font-size: 1.05rem; }
+  .top-line strong { font-family: var(--lcd-font); font-size: 1.3rem; font-weight: 500; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 190px; overflow-y: auto; padding: 2px 0; }
+  .chip { font: 400 1rem var(--lcd-font); padding: 3px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .tbl-wrap { overflow-x: auto; max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th { text-align: left; font-weight: 500; color: var(--muted); padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td.num { font-family: var(--lcd-font); font-size: 1.1rem; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  th.n { text-align: right; }
+  .bar-cell { width: 40%; min-width: 120px; }
+  .bar { height: 10px; background: var(--bar-other); border-radius: 5px; }
+  .bar.top { background: var(--accent); }
+  tr.top td.num, tr.top td.n { font-weight: 600; }
+
+  /* ---------- log ---------- */
+  .log { margin-top: 48px; padding-top: 24px; border-top: 2px solid var(--ink); }
+  .log-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .log-head p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  /* ---------- patterns, storage tags ---------- */
+  .pat-items { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .pat-arrow { color: var(--muted); }
+  td.where-cell { white-space: normal; min-width: 14ch; color: var(--muted); font-size: .88rem; }
+  .tag { font-size: .8rem; color: var(--muted); }
+  .tag.page { color: var(--accent); font-weight: 500; }
+  .btn.link {
+    border: 0; background: transparent; color: var(--accent); padding: 4px 6px; font-size: .9rem; text-decoration: underline; cursor: pointer;
+  }
+  details.how { margin-top: 10px; color: var(--muted); font-size: .92rem; max-width: 68ch; }
+  details.how summary { cursor: pointer; color: var(--ink); }
+  details.how p { margin: 8px 0 0; }
+  .saveline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+  .saveline .msg { margin: 0; }
+
+  .verdict { font-size: 1.05rem; margin: 0 0 6px; }
+  .sig-yes { color: var(--accent); font-weight: 600; }
+  .sig-no { color: var(--muted); }
+  td.tag { white-space: normal; }
+</style>
+</head>
+<body>
+<div id="shell">
+<div class="wrap">
+  <header>
+    <h1>Numpad tally</h1>
+    <p class="intro">Choose how many digits each number has and how many minutes you get, then type as many numbers as you can. When time is up you see everything you typed, how many were different, how often each one repeated, which runs of two or three numbers came back, and whether that repetition is statistically significant. Rounds are saved in this browser's storage as you go, and a button lets you download the whole log as a CSV file whenever you want.</p>
+  </header>
+
+  <main id="app" data-phase="setup">
+    <section class="device" aria-label="Numpad">
+      <div class="lcd">
+        <div class="lcd-row"><span class="lcd-label">Time left</span><span class="clock" id="clock">01:00</span></div>
+        <div class="slots" id="slots" aria-hidden="true"></div>
+        <div class="lcd-row"><span class="lcd-label">Numbers typed</span><span id="lcdCount">0</span></div>
+        <div class="progress"><div id="bar"></div></div>
+      </div>
+      <div class="keys" id="keys">
+        <button type="button" data-k="1">1</button>
+        <button type="button" data-k="2">2</button>
+        <button type="button" data-k="3">3</button>
+        <button type="button" data-k="4">4</button>
+        <button type="button" data-k="5">5</button>
+        <button type="button" data-k="6">6</button>
+        <button type="button" data-k="7">7</button>
+        <button type="button" data-k="8">8</button>
+        <button type="button" data-k="9">9</button>
+        <button type="button" data-k="clear" class="aux" aria-label="Clear the digits typed so far">C</button>
+        <button type="button" data-k="0">0</button>
+        <button type="button" data-k="del" class="aux" aria-label="Delete last digit">&#9003;</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <!-- setup -->
+      <div id="setup">
+        <h2>Set up a round</h2>
+        <div class="field">
+          <span class="lbl" id="nLbl">Digits per number (N)</span>
+          <p class="hint">Each number is committed as soon as you type this many digits.</p>
+          <div class="stepper" role="group" aria-labelledby="nLbl">
+            <button type="button" id="nDown" aria-label="Fewer digits">&minus;</button>
+            <output id="nOut" aria-live="polite">4</output>
+            <button type="button" id="nUp" aria-label="More digits">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tIn">Time (T) in minutes</label>
+          <p class="hint">Decimals work: 0.5 is thirty seconds.</p>
+          <input type="number" id="tIn" min="0.1" max="180" step="0.5" value="1" inputmode="decimal">
+          <span class="presets" role="group" aria-label="Time presets">
+            <button type="button" data-t="1">1</button>
+            <button type="button" data-t="2">2</button>
+            <button type="button" data-t="5">5</button>
+            <button type="button" data-t="10">10</button>
+          </span>
+        </div>
+        <button type="button" class="btn primary" id="startBtn">Start round</button>
+        <p class="msg" id="setupMsg" role="status"></p>
+      </div>
+
+      <!-- running -->
+      <div id="running" hidden>
+        <h2 id="runTitle">Round in progress</h2>
+        <div class="live-count" id="liveCount">0</div>
+        <div class="hint">numbers committed so far. Use the keypad or your keyboard.</div>
+        <ul class="entries" id="liveList"></ul>
+        <div class="btn-row"><button type="button" class="btn small" id="cancelBtn">Cancel round</button></div>
+      </div>
+
+      <!-- results -->
+      <div id="results" hidden>
+        <h2 id="rTitle">Round finished</h2>
+        <div class="stats">
+          <div class="stat"><div class="v" id="rTotal">0</div><div class="k">numbers typed</div></div>
+          <div class="stat"><div class="v" id="rDistinct">0</div><div class="k">different numbers</div></div>
+          <div class="stat"><div class="v" id="rMaxFreq">0</div><div class="k">highest frequency</div></div>
+        </div>
+        <p class="top-line" id="topLine"></p>
+        <div class="saveline">
+          <button type="button" class="btn small" id="saveNowBtn" hidden>Save into the page</button>
+          <p class="msg" id="saveMsg" role="status"></p>
+        </div>
+
+        <h3>Is the repetition statistically significant?</h3>
+        <p class="verdict" id="sigVerdict"></p>
+        <p class="hint" id="sigModel"></p>
+        <div class="tbl-wrap">
+          <table id="sigTable" hidden>
+            <thead><tr><th>Test</th><th class="n">Observed</th><th class="n">Expected by chance</th><th class="n">p-value</th><th class="n">Adjusted p</th><th>Verdict</th></tr></thead>
+            <tbody id="sigBody"></tbody>
+          </table>
+        </div>
+        <details class="how">
+          <summary>How the significance test works</summary>
+          <p>Each test asks: if only chance were at work, how often would a result at least this repetitive turn up? That fraction is the p-value. Small means unlikely to be chance.</p>
+          <p>The first two tests use this chance model: every number is picked independently and at random from all 10^N possible numbers. The page simulates that many times with the same amount of numbers as yours, and counts how often the simulated most-frequent number (or the number of equal pairs) is at least as large as yours. The last two tests keep your own numbers and only shuffle their order at random, then ask how often a run of 2 (or 3) numbers repeats as many times as yours did. That separates &ldquo;you favour certain numbers&rdquo; from &ldquo;you type certain numbers in a certain order&rdquo;.</p>
+          <p>Four tests are run at once, which makes a lucky hit more likely, so each p-value is multiplied by the number of tests (capped at 1) to give the adjusted p. A result is called significant when the adjusted p is below 0.05. Significant means more repetitive than random picking, not why. People are not random number generators, so rounds with lots of numbers will often show it. With only a handful of numbers the tests have little power, and a &ldquo;not significant&rdquo; result does not prove there is no pattern.</p>
+        </details>
+
+        <h3>Repeating patterns</h3>
+        <p class="hint" id="patHint"></p>
+        <div class="tbl-wrap">
+          <table id="patTable" hidden>
+            <thead><tr><th>Pattern</th><th class="n">Times</th><th>Starts at number</th></tr></thead>
+            <tbody id="patBody"></tbody>
+          </table>
+        </div>
+        <details class="how">
+          <summary>How patterns are found</summary>
+          <p>The numbers are read in the order you typed them. A sliding window moves one number at a time and takes every run of 2 numbers, then every run of 3. Identical runs are counted (runs may overlap). Runs seen at least twice are patterns. A shorter run is hidden when it only ever appears inside a longer pattern with the same count, so 1234 &rarr; 5678 &rarr; 9012 is not also listed as its two halves. A loop that repeats (A &rarr; B &rarr; C, then B &rarr; C &rarr; A and so on) is listed once, under its most repeated starting point.</p>
+        </details>
+
+        <h3>Everything you typed, in order</h3>
+        <div class="chips" id="rChips"></div>
+
+        <h3>Frequency of each different number</h3>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Number</th><th class="n">Times typed</th><th class="bar-cell">Share of the top frequency</th></tr></thead>
+            <tbody id="rTable"></tbody>
+          </table>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="againBtn">Run again</button>
+          <button type="button" class="btn" id="changeBtn">Change settings</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="log" aria-labelledby="logTitle">
+    <div class="log-head">
+      <h2 id="logTitle">Saved log</h2>
+      <p id="logCount"></p>
+    </div>
+    <p class="hint" id="logWhere"></p>
+    <div class="tbl-wrap">
+      <table id="logTable" hidden>
+        <thead><tr><th>Date</th><th>Time</th><th>Number</th><th class="n">Frequency</th><th class="n">N</th><th class="n">T (min)</th><th>Top pattern</th><th>Significant?</th><th>Stored in</th><th></th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="logEmpty">Nothing saved yet. Finish a round and it will appear here.</p>
+    <div class="btn-row">
+      <button type="button" class="btn small primary" id="savePageBtn" hidden>Save into the page</button>
+      <button type="button" class="btn small" id="exportBtn" hidden>Export as CSV</button>
+      <button type="button" class="btn small warn" id="clearBtn" hidden>Clear log</button>
+    </div>
+    <p class="msg" id="logMsg" role="status"></p>
+  </section>
+</div>
+</div>
+
+<script id="app-js">(function () {
+  "use strict";
+  var $ = function (s) { return document.querySelector(s); };
+
+  var state = { phase: "setup", N: 4, T: 1, startedAt: 0, endAt: 0, buffer: "", entries: [], timer: null, viewing: null };
+
+  /* ---------- helpers ---------- */
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtClock(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    return pad(Math.floor(s / 60)) + ":" + pad(s % 60);
+  }
+  function fmtT(t) { return String(Math.round(t * 100) / 100); }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+  function ss(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+  function sg(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function sd(k) { try { sessionStorage.removeItem(k); } catch (e) {} }
+  function fmtP(p) { return p < 0.001 ? "< 0.001" : p.toFixed(3); }
+  function fmtX(x) { return String(Math.round(x * 100) / 100); }
+
+  /* ---------- analysis ---------- */
+  function analyse(entries) {
+    var map = Object.create(null);
+    entries.forEach(function (n) { map[n] = (map[n] || 0) + 1; });
+    var rows = Object.keys(map).map(function (k) { return { number: k, count: map[k] }; });
+    rows.sort(function (a, b) { return b.count - a.count || (a.number < b.number ? -1 : 1); });
+    return { rows: rows, max: rows.length ? rows[0].count : 0, distinct: rows.length, total: entries.length };
+  }
+
+  /* Runs of 2 and 3 numbers, in typed order, seen at least twice. */
+  function findPatterns(seq) {
+    var MIN_TIMES = 2, MIN_LEN = 2, MAX_LEN = 3;
+    var byLen = {};
+    for (var k = MIN_LEN; k <= MAX_LEN; k++) {
+      var map = Object.create(null);
+      for (var i = 0; i + k <= seq.length; i++) {
+        var items = seq.slice(i, i + k);
+        var key = items.join(">");
+        if (!map[key]) map[key] = { items: items, len: k, count: 0, pos: [] };
+        map[key].count++;
+        map[key].pos.push(i + 1);
+      }
+      byLen[k] = map;
+    }
+    var out = [];
+    for (var len = MIN_LEN; len <= MAX_LEN; len++) {
+      var m = byLen[len];
+      Object.keys(m).forEach(function (key) {
+        var p = m[key];
+        if (p.count < MIN_TIMES) return;
+        var covered = false; // hidden when a longer pattern containing it has the same count
+        if (p.len < MAX_LEN) {
+          var longer = byLen[p.len + 1];
+          Object.keys(longer).forEach(function (lk) {
+            var q = longer[lk];
+            if (q.count !== p.count) return;
+            if (q.items.slice(0, p.len).join(">") === key || q.items.slice(1).join(">") === key) covered = true;
+          });
+        }
+        if (!covered) out.push(p);
+      });
+    }
+    // a loop A>B>C also yields B>C>A and C>A>B; keep only the most repeated rotation
+    var best = Object.create(null);
+    out.forEach(function (p) {
+      var rots = [];
+      for (var r = 0; r < p.len; r++) rots.push(p.items.slice(r).concat(p.items.slice(0, r)).join(">"));
+      rots.sort();
+      var canon = p.len + ":" + rots[0];
+      var cur = best[canon];
+      if (!cur || p.count > cur.count || (p.count === cur.count && p.pos[0] < cur.pos[0])) best[canon] = p;
+    });
+    out = Object.keys(best).map(function (k2) { return best[k2]; });
+    out.sort(function (a, b) { return b.count - a.count || b.len - a.len || a.pos[0] - b.pos[0]; });
+    return out;
+  }
+
+  /* ---------- significance (Monte Carlo) ---------- */
+  function maxRun(seq, k) {
+    var m = Object.create(null), mx = 0;
+    for (var i = 0; i + k <= seq.length; i++) {
+      var key = seq[i];
+      for (var j = 1; j < k; j++) key += ">" + seq[i + j];
+      var c = (m[key] || 0) + 1;
+      m[key] = c;
+      if (c > mx) mx = c;
+    }
+    return mx;
+  }
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+  }
+  /* Chance model 1 (frequency tests): every number is drawn independently and uniformly from all 10^N possible numbers.
+     Chance model 2 (order tests): the typed numbers are kept, only their order is shuffled at random. */
+  function significance(numbers, N) {
+    var M = numbers.length, D = Math.pow(10, N);
+    var out = { M: M, N: N, D: D, sims: 0, tests: [] };
+    if (M < 2) return out;
+    var R = M > 800 ? 800 : (M > 400 ? 1500 : 3000);
+    out.sims = R;
+    var a = analyse(numbers);
+    var obsPairs = 0;
+    a.rows.forEach(function (x) { obsPairs += x.count * (x.count - 1) / 2; });
+
+    var geMax = 0, gePairs = 0, sumMax = 0, sumPairs = 0, r, i;
+    for (r = 0; r < R; r++) {
+      var m = new Map(), mx = 0, pr = 0;
+      for (i = 0; i < M; i++) {
+        var v = Math.floor(Math.random() * D);
+        var c = (m.get(v) || 0) + 1;
+        m.set(v, c);
+        if (c > mx) mx = c;
+        pr += c - 1;
+      }
+      sumMax += mx; sumPairs += pr;
+      if (mx >= a.max) geMax++;
+      if (pr >= obsPairs) gePairs++;
+    }
+    out.tests.push({ id: "topfreq", label: "Most frequent number (times typed)", observed: a.max, expected: sumMax / R, p: (1 + geMax) / (R + 1) });
+    out.tests.push({ id: "pairs", label: "Pairs of equal numbers, overall", observed: obsPairs, expected: sumPairs / R, p: (1 + gePairs) / (R + 1) });
+
+    if (M >= 4) {
+      var o2 = maxRun(numbers, 2), o3 = maxRun(numbers, 3);
+      var ge2 = 0, ge3 = 0, s2 = 0, s3 = 0, arr = numbers.slice();
+      for (r = 0; r < R; r++) {
+        shuffle(arr);
+        var x2 = maxRun(arr, 2), x3 = maxRun(arr, 3);
+        s2 += x2; s3 += x3;
+        if (x2 >= o2) ge2++;
+        if (x3 >= o3) ge3++;
+      }
+      out.tests.push({ id: "run2", label: "Most repeated run of 2 numbers (times)", observed: o2, expected: s2 / R, p: (1 + ge2) / (R + 1) });
+      out.tests.push({ id: "run3", label: "Most repeated run of 3 numbers (times)", observed: o3, expected: s3 / R, p: (1 + ge3) / (R + 1) });
+    }
+    var k = out.tests.length;
+    out.tests.forEach(function (t) { t.padj = Math.min(1, t.p * k); });
+    return out;
+  }
+
+  function renderSig(sig, N) {
+    var body = $("#sigBody"), tbl = $("#sigTable"), verdict = $("#sigVerdict"), model = $("#sigModel");
+    body.textContent = "";
+    if (!sig || !sig.tests || !sig.tests.length) {
+      tbl.hidden = true;
+      verdict.textContent = "At least two numbers are needed before a significance test makes sense.";
+      model.textContent = "";
+      return;
+    }
+    tbl.hidden = false;
+    var hits = [];
+    sig.tests.forEach(function (t) {
+      var yes = t.padj < 0.05;
+      if (yes) hits.push(t);
+      var tr = document.createElement("tr");
+      function cell(text, cls) { var td = document.createElement("td"); if (cls) td.className = cls; td.textContent = text; tr.appendChild(td); return td; }
+      var lab = cell(t.label); lab.style.whiteSpace = "normal";
+      cell(fmtX(t.observed), "n");
+      cell(fmtX(t.expected), "n");
+      cell(fmtP(t.p), "n");
+      cell(fmtP(t.padj), "n");
+      cell(yes ? "Significant" : "Not significant", yes ? "sig-yes" : "sig-no");
+      body.appendChild(tr);
+    });
+    if (hits.length) {
+      var SHORT = { topfreq: "the most frequent number", pairs: "the overall repeats of equal numbers", run2: "the runs of 2 numbers", run3: "the runs of 3 numbers" };
+      var names = hits.map(function (t) { return SHORT[t.id] || t.label; });
+      var list = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
+      verdict.textContent = "Yes. Unlikely to be chance (adjusted p below 0.05): " + list + ".";
+      verdict.className = "verdict sig-yes";
+    } else {
+      verdict.textContent = "No: the repetition in this round is about what chance alone would produce (no adjusted p below 0.05).";
+      verdict.className = "verdict";
+    }
+    model.textContent = "Chance model for the first two tests: each number picked at random from all " + Math.pow(10, sig.N || N).toLocaleString("en-US") +
+      " possible " + (sig.N || N) + "-digit numbers. Simulated " + sig.sims.toLocaleString("en-US") + " times.";
+  }
+
+  /* ---------- device ---------- */
+  function renderSlots() {
+    var N = state.N, el = $("#slots");
+    el.style.fontSize = Math.min(44, Math.floor(280 / (N * 0.85))) + "px";
+    el.textContent = "";
+    for (var i = 0; i < N; i++) {
+      var s = document.createElement("span");
+      s.className = "slot";
+      s.textContent = state.buffer.charAt(i);
+      el.appendChild(s);
+    }
+  }
+  function renderCount() {
+    $("#lcdCount").textContent = state.entries.length;
+    $("#liveCount").textContent = state.entries.length;
+  }
+  function setKeysEnabled(on) {
+    var b = document.querySelectorAll("#keys button");
+    for (var i = 0; i < b.length; i++) b[i].disabled = !on;
+  }
+  function setPhase(p) {
+    state.phase = p;
+    $("#app").setAttribute("data-phase", p);
+    $("#setup").hidden = p !== "setup";
+    $("#running").hidden = p !== "run";
+    $("#results").hidden = p !== "done";
+    setKeysEnabled(p === "run");
+  }
+
+  /* ---------- setup ---------- */
+  function setN(n) {
+    state.N = Math.max(1, Math.min(10, n));
+    $("#nOut").textContent = state.N;
+    renderSlots();
+  }
+  function readT() {
+    var v = parseFloat($("#tIn").value);
+    return isFinite(v) ? v : NaN;
+  }
+  function previewClock() {
+    var t = readT();
+    if (t > 0) $("#clock").textContent = fmtClock(t * 60000);
+  }
+
+  /* ---------- round ---------- */
+  function startRound() {
+    var t = readT();
+    var msg = $("#setupMsg");
+    msg.className = "msg";
+    if (!(t >= 0.1 && t <= 180)) {
+      msg.className = "msg err";
+      msg.textContent = "Enter a time between 0.1 and 180 minutes.";
+      return;
+    }
+    msg.textContent = "";
+    state.T = t;
+    state.buffer = "";
+    state.entries = [];
+    state.viewing = null;
+    state.startedAt = Date.now();
+    state.endAt = state.startedAt + t * 60000;
+    $("#runTitle").textContent = "Typing " + state.N + "-digit numbers for " + fmtT(t) + (t === 1 ? " minute" : " minutes");
+    var list = $("#liveList");
+    list.textContent = "";
+    var e = document.createElement("li");
+    e.style.display = "block"; e.style.fontFamily = "var(--sans)"; e.style.fontSize = ".95rem"; e.style.color = "var(--muted)";
+    e.textContent = "Numbers you commit will appear here.";
+    list.appendChild(e);
+    setPhase("run");
+    renderSlots(); renderCount();
+    $("#bar").style.width = "0%";
+    clearInterval(state.timer);
+    state.timer = setInterval(tick, 200);
+    tick();
+  }
+  function tick() {
+    var left = state.endAt - Date.now();
+    var total = state.T * 60000;
+    $("#clock").textContent = fmtClock(left);
+    $("#bar").style.width = Math.min(100, Math.max(0, (1 - left / total) * 100)) + "%";
+    if (left <= 0) finishRound();
+  }
+  function toSetup() {
+    clearInterval(state.timer);
+    state.buffer = ""; state.entries = []; state.viewing = null;
+    setPhase("setup");
+    renderSlots(); renderCount(); previewClock();
+    $("#bar").style.width = "0%";
+  }
+  function press(k) {
+    if (state.phase !== "run") return;
+    if (k === "clear") { state.buffer = ""; }
+    else if (k === "del") { state.buffer = state.buffer.slice(0, -1); }
+    else if (/^[0-9]$/.test(k)) {
+      if (state.buffer.length < state.N) state.buffer += k;
+      if (state.buffer.length === state.N) { commit(); return; }
+    }
+    renderSlots();
+  }
+  function commit() {
+    var num = state.buffer;
+    state.entries.push(num);
+    var list = $("#liveList");
+    if (state.entries.length === 1) list.textContent = "";
+    var li = document.createElement("li");
+    var a = document.createElement("span"); a.textContent = num;
+    var b = document.createElement("span"); b.textContent = "#" + state.entries.length;
+    li.appendChild(a); li.appendChild(b);
+    list.insertBefore(li, list.firstChild);
+    renderSlots();
+    var slots = $("#slots");
+    slots.classList.add("flash");
+    state.buffer = "";
+    setTimeout(function () { slots.classList.remove("flash"); if (state.phase === "run") renderSlots(); }, 140);
+    renderCount();
+  }
+
+  function finishRound() {
+    clearInterval(state.timer);
+    var discarded = state.buffer.length;
+    state.buffer = "";
+    var round = null;
+    if (state.entries.length) {
+      var d = new Date(state.startedAt);
+      round = {
+        id: state.startedAt.toString(36) + Math.random().toString(36).slice(2, 6),
+        date: d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()),
+        time: pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()),
+        n: state.N,
+        t: state.T,
+        numbers: state.entries.slice()
+      };
+      round.sig = significance(round.numbers, round.n);
+      storeRound(round);
+    }
+    $("#clock").textContent = "00:00";
+    $("#bar").style.width = "100%";
+    showRound(round, { discarded: discarded, fresh: true, numbers: state.entries.slice() });
+    renderLog();
+  }
+
+  /* ---------- results view (fresh round or a round from the log) ---------- */
+  function showRound(round, opts) {
+    opts = opts || {};
+    var numbers = round ? round.numbers : (opts.numbers || []);
+    var a = analyse(numbers);
+    var pats = findPatterns(numbers);
+    state.viewing = round ? round.id : null;
+    setPhase("done");
+    renderSlots();
+
+    $("#rTitle").textContent = opts.fresh ? "Round finished"
+      : "Saved round from " + round.date + " " + round.time + " (N = " + round.n + ", T = " + fmtT(round.t) + " min)";
+    $("#rTotal").textContent = a.total;
+    $("#rDistinct").textContent = a.distinct;
+    $("#rMaxFreq").textContent = a.max;
+
+    var top = a.rows.filter(function (x) { return x.count === a.max; });
+    var topLine = $("#topLine");
+    topLine.textContent = "";
+    if (a.total === 0) {
+      topLine.textContent = "No complete numbers were typed this round.";
+    } else if (a.max === 1) {
+      topLine.textContent = "Every number was different, so none was more frequent than the others.";
+    } else {
+      topLine.appendChild(document.createTextNode(top.length > 1 ? "Most frequent (tied): " : "Most frequent: "));
+      top.forEach(function (x, i) {
+        var s = document.createElement("strong"); s.textContent = x.number; topLine.appendChild(s);
+        if (i < top.length - 1) topLine.appendChild(document.createTextNode(", "));
+      });
+      topLine.appendChild(document.createTextNode(", typed " + plural(a.max, "time", "times") + "."));
+    }
+    updateSaveLine(round, opts.discarded || 0);
+
+    // significance
+    var sig = null, N = round ? round.n : state.N;
+    if (round) { if (!round.sig) round.sig = significance(numbers, round.n); sig = round.sig; }
+    else if (numbers.length > 1) sig = significance(numbers, state.N);
+    renderSig(sig, N);
+
+    // patterns
+    var pt = $("#patTable"), pb = $("#patBody");
+    pb.textContent = "";
+    if (numbers.length < 2) {
+      $("#patHint").textContent = "You need at least two numbers before a pattern can show up.";
+      pt.hidden = true;
+    } else if (!pats.length) {
+      $("#patHint").textContent = "No run of 2 or 3 numbers repeated in this round.";
+      pt.hidden = true;
+    } else {
+      $("#patHint").textContent = "Runs of 2 or 3 numbers in a row that appeared at least twice, most repeated first.";
+      pt.hidden = false;
+      pats.forEach(function (p) {
+        var tr = document.createElement("tr");
+        var td1 = document.createElement("td");
+        var wrap = document.createElement("span"); wrap.className = "pat-items";
+        p.items.forEach(function (n, i) {
+          var c = document.createElement("span"); c.className = "chip"; c.textContent = n; wrap.appendChild(c);
+          if (i < p.items.length - 1) { var ar = document.createElement("span"); ar.className = "pat-arrow"; ar.textContent = "\u2192"; wrap.appendChild(ar); }
+        });
+        td1.appendChild(wrap);
+        var td2 = document.createElement("td"); td2.className = "n"; td2.textContent = p.count;
+        var td3 = document.createElement("td"); td3.className = "where-cell";
+        var shown = p.pos.slice(0, 10).map(function (x) { return "#" + x; }).join(", ");
+        td3.textContent = shown + (p.pos.length > 10 ? ", and " + (p.pos.length - 10) + " more" : "");
+        tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+        pb.appendChild(tr);
+      });
+    }
+
+    // chips
+    var chips = $("#rChips");
+    chips.textContent = "";
+    if (!numbers.length) {
+      var e = document.createElement("span"); e.className = "empty"; e.textContent = "None."; chips.appendChild(e);
+    }
+    numbers.forEach(function (n) {
+      var c = document.createElement("span"); c.className = "chip"; c.textContent = n; chips.appendChild(c);
+    });
+
+    // frequency table
+    var tb = $("#rTable");
+    tb.textContent = "";
+    a.rows.forEach(function (x) {
+      var isTop = x.count === a.max && a.max > 1;
+      var tr = document.createElement("tr");
+      if (isTop) tr.className = "top";
+      var td1 = document.createElement("td"); td1.className = "num"; td1.textContent = x.number;
+      var td2 = document.createElement("td"); td2.className = "n"; td2.textContent = x.count;
+      var td3 = document.createElement("td"); td3.className = "bar-cell";
+      var bar = document.createElement("div"); bar.className = "bar" + (isTop ? " top" : "");
+      bar.style.width = Math.round(x.count / a.max * 100) + "%";
+      td3.appendChild(bar);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------- log rows and CSV (shared by every storage backend) ---------- */
+  var CSV_COLS = ["date", "time", "number", "frequency", "N", "T_minutes", "total_numbers", "distinct_numbers",
+    "top_pattern", "pattern_times", "p_top_number", "p_equal_pairs", "p_run2", "p_run3", "significant"];
+
+  function r4(p) { return Math.round(p * 10000) / 10000; }
+
+  function roundRows(r) {
+    var a = analyse(r.numbers), pats = findPatterns(r.numbers), tp = pats[0] || null;
+    var sg_ = r.sig && r.sig.tests && r.sig.tests.length ? r.sig : null;
+    function P(id) {
+      if (!sg_) return "";
+      for (var i = 0; i < sg_.tests.length; i++) if (sg_.tests[i].id === id) return r4(sg_.tests[i].p);
+      return "";
+    }
+    var anySig = sg_ ? (sg_.tests.some(function (t) { return t.padj < 0.05; }) ? "yes" : "no") : "";
+    var base = {
+      id: r.id, date: r.date, time: r.time, n: r.n, t: r.t, total: a.total, distinct: a.distinct,
+      pattern: tp ? tp.items.join(" \u2192 ") : "", patternPlain: tp ? tp.items.join(" > ") : "", pTimes: tp ? tp.count : "",
+      pTop: P("topfreq"), pPairs: P("pairs"), pRun2: P("run2"), pRun3: P("run3"), significant: anySig
+    };
+    function make(number, freq) { var o = {}; for (var k in base) o[k] = base[k]; o.number = number; o.freq = freq; return o; }
+    var out = [];
+    if (a.max > 1) a.rows.filter(function (x) { return x.count === a.max; }).forEach(function (x) { out.push(make(x.number, x.count)); });
+    else out.push(make("", 1));
+    return out;
+  }
+  function csvRecord(r) {
+    return { date: r.date, time: r.time, number: r.number, frequency: r.freq, N: r.n, T_minutes: r.t,
+      total_numbers: r.total, distinct_numbers: r.distinct, top_pattern: r.patternPlain, pattern_times: r.pTimes,
+      p_top_number: r.pTop, p_equal_pairs: r.pPairs, p_run2: r.pRun2, p_run3: r.pRun3, significant: r.significant };
+  }
+  function csvEsc(v) {
+    var s = String(v == null ? "" : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function csvText() {
+    var lines = [CSV_COLS.join(",")];
+    logRows().forEach(function (row) {
+      var rec = csvRecord(row);
+      lines.push(CSV_COLS.map(function (c) { return c === "number" && rec[c] !== "" ? '"' + rec[c] + '"' : csvEsc(rec[c]); }).join(","));
+    });
+    return lines.join("\n") + "\n";
+  }
+  function logRows() {
+    var out = [];
+    allRounds().slice().reverse().forEach(function (r) {
+      var w = whereOf(r);
+      roundRows(r).forEach(function (row) { row.where = w; out.push(row); });
+    });
+    return out;
+  }
+
+  function renderLog() {
+    var rows = logRows();
+    var body = $("#logBody");
+    body.textContent = "";
+    rows.forEach(function (r) {
+      var tr = document.createElement("tr");
+      function cell(text, cls) {
+        var td = document.createElement("td");
+        if (cls) td.className = cls;
+        td.textContent = text;
+        tr.appendChild(td);
+        return td;
+      }
+      cell(r.date); cell(r.time);
+      cell(r.number === "" ? "all different" : r.number, r.number === "" ? "" : "num");
+      cell(r.freq, "n"); cell(r.n, "n"); cell(fmtT(r.t), "n");
+      cell(r.pattern ? r.pattern + "  (\u00d7" + r.pTimes + ")" : "none");
+      cell(r.significant === "yes" ? "yes" : (r.significant === "no" ? "no" : "-"), r.significant === "yes" ? "sig-yes" : "");
+      cell(r.where.label, "tag " + r.where.cls);
+      var tdv = document.createElement("td");
+      var vb = document.createElement("button");
+      vb.type = "button"; vb.className = "btn link"; vb.textContent = "View round";
+      vb.addEventListener("click", function () {
+        var round = findRound(r.id);
+        if (round) { showRound(round, {}); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      });
+      tdv.appendChild(vb); tr.appendChild(tdv);
+      body.appendChild(tr);
+    });
+    var total = allRounds().length;
+    var has = total > 0;
+    $("#logTable").hidden = !has;
+    $("#logEmpty").hidden = has;
+    $("#logCount").textContent = has ? plural(total, "round", "rounds") + ", newest first" : "";
+    refreshStorageUI(has);
+  }
+
+  /* ================= storage: this browser only (localStorage), static file ================= */
+  var STORE_KEY = "numpad-tally-rounds-v1";
+  var rounds = [];
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) rounds = arr.filter(function (r) { return r && r.id && Array.isArray(r.numbers); });
+  } catch (e) {}
+  var storageOK = true;
+  function persist() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(rounds)); storageOK = true; }
+    catch (e) { storageOK = false; } // e.g. private browsing with storage disabled, or quota full
+  }
+
+  function allRounds() { return rounds; }
+  function findRound(id) {
+    for (var i = 0; i < rounds.length; i++) if (rounds[i].id === id) return rounds[i];
+    return null;
+  }
+  function whereOf() { return { label: "this browser", cls: "" }; }
+  function storeRound(round) { rounds.push(round); persist(); }
+
+  function updateSaveLine(round, discarded) {
+    var msg = $("#saveMsg");
+    $("#saveNowBtn").hidden = true;
+    msg.className = storageOK ? "msg" : "msg err";
+    var parts = [];
+    if (!round) parts.push("Nothing to save.");
+    else if (storageOK) parts.push("Saved in this browser's storage.");
+    else parts.push("This browser's storage is full or unavailable, so this round was not saved. Download it as CSV before you close the tab.");
+    if (discarded) parts.push(plural(discarded, "unfinished digit was", "unfinished digits were") + " discarded.");
+    msg.textContent = parts.join(" ");
+  }
+
+  function refreshStorageUI(has) {
+    $("#savePageBtn").hidden = true;
+    $("#exportBtn").hidden = !has;
+    $("#clearBtn").hidden = !has;
+    $("#logWhere").textContent = has
+      ? "Kept in this browser's local storage \u2014 tied to this device and this browser, and cleared if you clear site data. Nothing is sent anywhere. Use \u201cDownload as CSV\u201d to keep a copy outside the browser. Date and time are when the round started."
+      : "";
+  }
+
+  function exportCsv() {
+    if (!rounds.length) return;
+    var uri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvText());
+    var a = document.createElement("a");
+    a.href = uri; a.download = "numpad-tally-log.csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    $("#logMsg").className = "msg";
+    $("#logMsg").textContent = "Downloaded numpad-tally-log.csv.";
+  }
+
+  var clearArmed = false, clearTimer = null;
+  function clearLog() {
+    var btn = $("#clearBtn");
+    if (!clearArmed) {
+      clearArmed = true;
+      btn.textContent = "Click again to clear";
+      clearTimer = setTimeout(function () { clearArmed = false; btn.textContent = "Clear log"; }, 4000);
+      return;
+    }
+    clearTimeout(clearTimer);
+    clearArmed = false;
+    btn.textContent = "Clear log";
+    rounds = [];
+    persist();
+    state.viewing = null;
+    $("#logMsg").textContent = "";
+    renderLog();
+    if (state.phase === "done") toSetup();
+  }
+
+  $("#exportBtn").addEventListener("click", exportCsv);
+  $("#clearBtn").addEventListener("click", clearLog);
+
+  function initStorage() { renderLog(); }
+
+
+  /* ---------- wiring ---------- */
+  $("#nDown").addEventListener("click", function () { setN(state.N - 1); });
+  $("#nUp").addEventListener("click", function () { setN(state.N + 1); });
+  $("#tIn").addEventListener("input", previewClock);
+  document.querySelectorAll(".presets button").forEach(function (b) {
+    b.addEventListener("click", function () { $("#tIn").value = b.getAttribute("data-t"); previewClock(); });
+  });
+  $("#startBtn").addEventListener("click", startRound);
+  $("#cancelBtn").addEventListener("click", toSetup);
+  $("#againBtn").addEventListener("click", startRound);
+  $("#changeBtn").addEventListener("click", toSetup);
+  $("#keys").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-k]");
+    if (b) press(b.getAttribute("data-k"));
+  });
+  document.addEventListener("keydown", function (e) {
+    if (state.phase !== "run" || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key >= "0" && e.key <= "9" && e.key.length === 1) { e.preventDefault(); press(e.key); }
+    else if (e.key === "Backspace") { e.preventDefault(); press("del"); }
+    else if (e.key === "Escape" || e.key === "Delete") { e.preventDefault(); press("clear"); }
+  });
+
+  /* init */
+  setN(4);
+  setPhase("setup");
+  renderCount();
+  previewClock();
+  renderLog();
+  initStorage();
+})();
+</script>
+</body>
+</html>
