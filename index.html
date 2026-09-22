@@ -312,6 +312,7 @@
           <div class="stat"><div class="v" id="rTotal">0</div><div class="k">numbers typed</div></div>
           <div class="stat"><div class="v" id="rDistinct">0</div><div class="k">different numbers</div></div>
           <div class="stat"><div class="v" id="rMaxFreq">0</div><div class="k">highest frequency</div></div>
+          <div class="stat"><div class="v" id="rTest">0</div><div class="k">test = different &divide; total</div></div>
         </div>
         <p class="top-line" id="topLine"></p>
         <div class="saveline">
@@ -334,6 +335,8 @@
           <p>The first two tests use this chance model: every number is picked independently and at random from all 10^N possible numbers. The page simulates that many times with the same amount of numbers as yours, and counts how often the simulated most-frequent number (or the number of equal pairs) is at least as large as yours. The last two tests keep your own numbers and only shuffle their order at random, then ask how often a run of 2 (or 3) numbers repeats as many times as yours did. That separates &ldquo;you favour certain numbers&rdquo; from &ldquo;you type certain numbers in a certain order&rdquo;.</p>
           <p>Four tests are run at once, which makes a lucky hit more likely, so each p-value is multiplied by the number of tests (capped at 1) to give the adjusted p. A result is called significant when the adjusted p is below 0.05. Significant means more repetitive than random picking, not why. People are not random number generators, so rounds with lots of numbers will often show it. With only a handful of numbers the tests have little power, and a &ldquo;not significant&rdquo; result does not prove there is no pattern.</p>
         </details>
+
+        <p class="hint">Test is <strong>different numbers &divide; total numbers</strong>, from 0 to 1. Close to 1 means almost every number was different; close to 0 means the same few numbers came up again and again. It is a quick summary, not a significance test by itself &mdash; check the table above for that.</p>
 
         <h3>Repeating patterns</h3>
         <p class="hint" id="patHint"></p>
@@ -375,7 +378,7 @@
     <p class="hint" id="logWhere"></p>
     <div class="tbl-wrap">
       <table id="logTable" hidden>
-        <thead><tr><th>Date</th><th>Time</th><th>Number</th><th class="n">Frequency</th><th class="n">N</th><th class="n">T (min)</th><th>Top pattern</th><th>Significant?</th><th>Stored in</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Time</th><th>Number</th><th class="n">Frequency</th><th class="n">N</th><th class="n">T (min)</th><th>Test</th><th>Top pattern</th><th>Significant?</th><th>Stored in</th><th></th></tr></thead>
         <tbody id="logBody"></tbody>
       </table>
     </div>
@@ -416,8 +419,11 @@
     entries.forEach(function (n) { map[n] = (map[n] || 0) + 1; });
     var rows = Object.keys(map).map(function (k) { return { number: k, count: map[k] }; });
     rows.sort(function (a, b) { return b.count - a.count || (a.number < b.number ? -1 : 1); });
-    return { rows: rows, max: rows.length ? rows[0].count : 0, distinct: rows.length, total: entries.length };
+    var total = entries.length, distinct = rows.length;
+    return { rows: rows, max: rows.length ? rows[0].count : 0, distinct: distinct, total: total,
+      test: total ? distinct / total : 0 };
   }
+  function fmtRatio(x) { return x.toFixed(3).replace(/0+$/, "").replace(/\.$/, ".0"); }
 
   /* Runs of 2 and 3 numbers, in typed order, seen at least twice. */
   function findPatterns(seq) {
@@ -726,6 +732,7 @@
     $("#rTotal").textContent = a.total;
     $("#rDistinct").textContent = a.distinct;
     $("#rMaxFreq").textContent = a.max;
+    $("#rTest").textContent = a.total ? fmtRatio(a.test) : "\u2013";
 
     var top = a.rows.filter(function (x) { return x.count === a.max; });
     var topLine = $("#topLine");
@@ -810,7 +817,7 @@
 
   /* ---------- log rows and CSV (shared by every storage backend) ---------- */
   var CSV_COLS = ["date", "time", "number", "frequency", "N", "T_minutes", "total_numbers", "distinct_numbers",
-    "top_pattern", "pattern_times", "p_top_number", "p_equal_pairs", "p_run2", "p_run3", "significant"];
+    "test", "top_pattern", "pattern_times", "p_top_number", "p_equal_pairs", "p_run2", "p_run3", "significant"];
 
   function r4(p) { return Math.round(p * 10000) / 10000; }
 
@@ -824,7 +831,7 @@
     }
     var anySig = sg_ ? (sg_.tests.some(function (t) { return t.padj < 0.05; }) ? "yes" : "no") : "";
     var base = {
-      id: r.id, date: r.date, time: r.time, n: r.n, t: r.t, total: a.total, distinct: a.distinct,
+      id: r.id, date: r.date, time: r.time, n: r.n, t: r.t, total: a.total, distinct: a.distinct, test: r4(a.test),
       pattern: tp ? tp.items.join(" \u2192 ") : "", patternPlain: tp ? tp.items.join(" > ") : "", pTimes: tp ? tp.count : "",
       pTop: P("topfreq"), pPairs: P("pairs"), pRun2: P("run2"), pRun3: P("run3"), significant: anySig
     };
@@ -836,7 +843,7 @@
   }
   function csvRecord(r) {
     return { date: r.date, time: r.time, number: r.number, frequency: r.freq, N: r.n, T_minutes: r.t,
-      total_numbers: r.total, distinct_numbers: r.distinct, top_pattern: r.patternPlain, pattern_times: r.pTimes,
+      total_numbers: r.total, distinct_numbers: r.distinct, test: r.test, top_pattern: r.patternPlain, pattern_times: r.pTimes,
       p_top_number: r.pTop, p_equal_pairs: r.pPairs, p_run2: r.pRun2, p_run3: r.pRun3, significant: r.significant };
   }
   function csvEsc(v) {
@@ -876,6 +883,7 @@
       cell(r.date); cell(r.time);
       cell(r.number === "" ? "all different" : r.number, r.number === "" ? "" : "num");
       cell(r.freq, "n"); cell(r.n, "n"); cell(fmtT(r.t), "n");
+      cell(r.test === "" ? "" : fmtRatio(r.test), "n");
       cell(r.pattern ? r.pattern + "  (\u00d7" + r.pTimes + ")" : "none");
       cell(r.significant === "yes" ? "yes" : (r.significant === "no" ? "no" : "-"), r.significant === "yes" ? "sig-yes" : "");
       cell(r.where.label, "tag " + r.where.cls);
